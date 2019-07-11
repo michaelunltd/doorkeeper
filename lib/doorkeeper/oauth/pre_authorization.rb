@@ -10,13 +10,14 @@ module Doorkeeper
       validate :scopes, error: :invalid_scope
       validate :redirect_uri, error: :invalid_redirect_uri
       validate :code_challenge_method, error: :invalid_code_challenge_method
+      validate :client_supports_grant_flow, error: :unauthorized_client
 
-      attr_accessor :server, :client, :response_type, :redirect_uri, :state,
+      attr_accessor :config, :client, :response_type, :redirect_uri, :state,
                     :code_challenge, :code_challenge_method
       attr_writer   :scope
 
-      def initialize(server, client, attrs = {})
-        @server                = server
+      def initialize(config, client, attrs = {})
+        @config                = config
         @client                = client
         @response_type         = attrs[:response_type]
         @redirect_uri          = attrs[:redirect_uri]
@@ -28,6 +29,10 @@ module Doorkeeper
 
       def authorizable?
         valid?
+      end
+
+      def validate_client_supports_grant_flow
+        Doorkeeper.configuration.allow_grant_flow_for_client?(grant_type, client.application)
       end
 
       def scopes
@@ -59,14 +64,14 @@ module Doorkeeper
       def build_scopes
         client_scopes = client.application.scopes
         if client_scopes.blank?
-          server.default_scopes.to_s
+          config.default_scopes.to_s
         else
-          (server.default_scopes & client_scopes).to_s
+          (config.default_scopes & client_scopes).to_s
         end
       end
 
       def validate_response_type
-        server.authorization_response_types.include? response_type
+        config.authorization_response_types.include?(response_type)
       end
 
       def validate_client
@@ -78,7 +83,7 @@ module Doorkeeper
 
         Helpers::ScopeChecker.valid?(
           scope_str: scope,
-          server_scopes: server.scopes,
+          server_scopes: config.scopes,
           app_scopes: client.application.scopes,
           grant_type: grant_type
         )
