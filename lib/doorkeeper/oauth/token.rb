@@ -34,7 +34,9 @@ module Doorkeeper
         def from_bearer_authorization(request)
           pattern = /^Bearer /i
           header  = request.authorization
-          token_from_header(header, pattern) if match?(header, pattern)
+          tokens = header.split(",").map(&:strip) if header
+          bearer_token = tokens.select { |t| t.downcase.include?("bearer") }.first if tokens
+          token_from_header(bearer_token, pattern) if match?(bearer_token, pattern)
         end
 
         def from_basic_authorization(request)
